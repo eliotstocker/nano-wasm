@@ -1,0 +1,36 @@
+{
+  "name": "nano-wasm",
+  "version": "8.0.0",
+  "description": "GNU nano 8.0 text editor compiled to WebAssembly (wasm32-wasip1) with ncurses 6.5 and built-in terminfo fallbacks",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./nano.wasm": "./dist/nano.wasm",
+    "./dist/nano.wasm": "./dist/nano.wasm"
+  },
+  "files": [
+    "dist/nano.wasm",
+    "nano.wasm",
+    "index.js",
+    "shim",
+    "scripts/build.sh"
+  ],
+  "scripts": {
+    "build": "bash scripts/build.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eliotstocker/nano-wasm.git"
+  },
+  "keywords": [
+    "nano",
+    "wasm",
+    "wasi",
+    "ncurses",
+    "terminal",
+    "brsh",
+    "editor"
+  ],
+  "author": "Eliot Stocker",
+  "license": "GPL-3.0-or-later"
+}

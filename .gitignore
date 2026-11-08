@@ -1,0 +1,5 @@
+build/
+.wasi-sdk/
+node_modules/
+*.log
+.DS_Store
