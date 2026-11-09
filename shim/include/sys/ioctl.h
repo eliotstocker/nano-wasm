@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 int ioctl(int fd, int request, ...);
+void set_terminal_size(int cols, int rows);
 
 #ifdef __cplusplus
 }

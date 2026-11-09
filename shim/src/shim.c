@@ -110,6 +110,20 @@ WEAK pid_t tcgetsid(int fd) {
     return 1;
 }
 
+WEAK int resizeterm(int lines, int columns);
+
+static unsigned short g_terminal_rows = 0;
+static unsigned short g_terminal_cols = 0;
+
+__attribute__((export_name("set_terminal_size")))
+void set_terminal_size(int cols, int rows) {
+    if (cols > 0) g_terminal_cols = (unsigned short)cols;
+    if (rows > 0) g_terminal_rows = (unsigned short)rows;
+    if (cols > 0 && rows > 0 && resizeterm) {
+        resizeterm(rows, cols);
+    }
+}
+
 WEAK int ioctl(int fd, int request, ...) {
     (void)fd;
     va_list ap;
@@ -118,12 +132,17 @@ WEAK int ioctl(int fd, int request, ...) {
         struct winsize *ws = va_arg(ap, struct winsize *);
         va_end(ap);
         if (!ws) { errno = EINVAL; return -1; }
-        const char *lines_env = getenv("LINES");
-        const char *cols_env = getenv("COLUMNS");
-        int rows = lines_env ? atoi(lines_env) : 0;
-        int cols = cols_env ? atoi(cols_env) : 0;
-        ws->ws_row = (rows > 0) ? (unsigned short)rows : 24;
-        ws->ws_col = (cols > 0) ? (unsigned short)cols : 80;
+        if (g_terminal_cols > 0 && g_terminal_rows > 0) {
+            ws->ws_row = g_terminal_rows;
+            ws->ws_col = g_terminal_cols;
+        } else {
+            const char *lines_env = getenv("LINES");
+            const char *cols_env = getenv("COLUMNS");
+            int rows = lines_env ? atoi(lines_env) : 0;
+            int cols = cols_env ? atoi(cols_env) : 0;
+            ws->ws_row = (rows > 0) ? (unsigned short)rows : 24;
+            ws->ws_col = (cols > 0) ? (unsigned short)cols : 80;
+        }
         ws->ws_xpixel = 0;
         ws->ws_ypixel = 0;
         return 0;

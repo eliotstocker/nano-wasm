@@ -8,6 +8,7 @@ DIST_DIR="$ROOT_DIR/dist"
 
 WASI_SDK_VERSION="25"
 WASI_SDK_FULL="25.0"
+BINARYEN_VERSION="119"
 NCURSES_VERSION="6.5"
 NANO_VERSION="8.0"
 
@@ -36,6 +37,19 @@ if [[ ! -d "$WASI_SDK_DIR" ]]; then
     echo "=== Downloading WASI SDK ${WASI_SDK_FULL} ==="
     curl -L "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/wasi-sdk-${WASI_SDK_FULL}-${WASI_ARCH}-${WASI_OS}.tar.gz" -o wasi-sdk.tar.gz
     tar -xzf wasi-sdk.tar.gz
+fi
+
+BINARYEN_DIR="$BUILD_DIR/binaryen-version_${BINARYEN_VERSION}"
+if command -v wasm-opt &> /dev/null; then
+    WASM_OPT="$(command -v wasm-opt)"
+    echo "=== Using system wasm-opt: $WASM_OPT ==="
+else
+    WASM_OPT="$BINARYEN_DIR/bin/wasm-opt"
+    if [[ ! -x "$WASM_OPT" ]]; then
+        echo "=== Downloading Binaryen version_${BINARYEN_VERSION} ==="
+        curl -L "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-${WASI_ARCH}-${WASI_OS}.tar.gz" -o binaryen.tar.gz
+        tar -xzf binaryen.tar.gz
+    fi
 fi
 
 if [[ ! -d "$BUILD_DIR/ncurses-${NCURSES_VERSION}" ]]; then
@@ -285,6 +299,12 @@ mkdir -p "$WASM_NANO"
 
     make -j4
     "$WASI_SDK_DIR/bin/llvm-strip" src/nano -o "$DIST_DIR/nano.wasm"
+
+    echo "=== Running wasm-opt with Asyncify ==="
+    "$WASM_OPT" "$DIST_DIR/nano.wasm" -o "$DIST_DIR/nano.wasm" -O2 \
+        --asyncify \
+        --pass-arg=asyncify-imports@wasi_snapshot_preview1.fd_read,wasi_snapshot_preview1.poll_oneoff
+
     cp "$DIST_DIR/nano.wasm" "$ROOT_DIR/nano.wasm"
 )
 
