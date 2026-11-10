@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
 SHIM_DIR="$ROOT_DIR/shim"
 DIST_DIR="$ROOT_DIR/dist"
+WASI_TERMIOS_DIR="${WASI_TERMIOS_DIR:-$ROOT_DIR/deps/wasi-termios-brsh}"
 
 WASI_SDK_VERSION="25"
 WASI_SDK_FULL="25.0"
@@ -14,6 +15,12 @@ NANO_VERSION="8.0"
 
 mkdir -p "$BUILD_DIR" "$DIST_DIR" "$SHIM_DIR/lib"
 cd "$BUILD_DIR"
+
+if [[ ! -f "$WASI_TERMIOS_DIR/src/termios.c" ]]; then
+    echo "=== Initializing wasi-termios-brsh ==="
+    git -C "$ROOT_DIR" submodule update --init --recursive 2>/dev/null || \
+    git clone https://github.com/eliotstocker/wasi-termios-brsh.git "$WASI_TERMIOS_DIR"
+fi
 
 # Detect host OS / arch for WASI SDK
 OS="$(uname -s)"
@@ -94,12 +101,15 @@ fi
 export PATH="$HOST_NCURSES/progs:$WASI_SDK_DIR/bin:$PATH"
 
 # 2. Build WASI POSIX / termios shim
-echo "=== Compiling WASI POSIX / termios shim ==="
+echo "=== Compiling wasi-termios-brsh and WASI POSIX shim ==="
 "$WASI_SDK_DIR/bin/clang" --target=wasm32-wasip1 -O2 \
-    -I"$SHIM_DIR/include" \
+    -I"$WASI_TERMIOS_DIR/include" \
+    -c "$WASI_TERMIOS_DIR/src/termios.c" -o "$SHIM_DIR/lib/termios.o"
+"$WASI_SDK_DIR/bin/clang" --target=wasm32-wasip1 -O2 \
+    -I"$WASI_TERMIOS_DIR/include" -I"$SHIM_DIR/include" \
     -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS \
     -c "$SHIM_DIR/src/shim.c" -o "$SHIM_DIR/lib/shim.o"
-"$WASI_SDK_DIR/bin/llvm-ar" rcs "$SHIM_DIR/lib/libwasi_posix_shim.a" "$SHIM_DIR/lib/shim.o"
+"$WASI_SDK_DIR/bin/llvm-ar" rcs "$SHIM_DIR/lib/libwasi_posix_shim.a" "$SHIM_DIR/lib/termios.o" "$SHIM_DIR/lib/shim.o"
 
 # 3. Compile minimal terminfo DB & cross-compile ncurses 6.5
 echo "=== Compiling minimal terminfo DB ==="
@@ -114,7 +124,7 @@ rm -rf "$WASM_NCURSES" "$DEPS_DIR"
 mkdir -p "$WASM_NCURSES" "$DEPS_DIR"
 (
     cd "$WASM_NCURSES"
-    COMMON_FLAGS="--target=wasm32-wasip1 -O2 -I$SHIM_DIR/include -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN"
+    COMMON_FLAGS="--target=wasm32-wasip1 -O2 -I$WASI_TERMIOS_DIR/include -I$SHIM_DIR/include -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN"
     COMMON_LDFLAGS="-L$SHIM_DIR/lib -lwasi_posix_shim -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 
     CC="$WASI_SDK_DIR/bin/clang" \
@@ -187,7 +197,7 @@ rm -rf "$WASM_NANO"
 mkdir -p "$WASM_NANO"
 (
     cd "$WASM_NANO"
-    COMMON_FLAGS="--target=wasm32-wasip1 -O2 -I$SHIM_DIR/include -I$DEPS_DIR/include -I$DEPS_DIR/include/ncursesw -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN"
+    COMMON_FLAGS="--target=wasm32-wasip1 -O2 -I$WASI_TERMIOS_DIR/include -I$SHIM_DIR/include -I$DEPS_DIR/include -I$DEPS_DIR/include/ncursesw -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN"
     COMMON_LDFLAGS="-Wl,--wrap=poll -Wl,--wrap=isatty -Wl,--wrap=readlink -Wl,--wrap=readlinkat -L$DEPS_DIR/lib -L$SHIM_DIR/lib -lncursesw -ltinfow -lwasi_posix_shim -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 
     CC="$WASI_SDK_DIR/bin/clang" \
@@ -196,7 +206,7 @@ mkdir -p "$WASM_NANO"
     NM="$WASI_SDK_DIR/bin/llvm-nm" \
     STRIP="$WASI_SDK_DIR/bin/llvm-strip" \
     CFLAGS="$COMMON_FLAGS" \
-    CPPFLAGS="-I$SHIM_DIR/include -I$DEPS_DIR/include -I$DEPS_DIR/include/ncursesw -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN" \
+    CPPFLAGS="-I$WASI_TERMIOS_DIR/include -I$SHIM_DIR/include -I$DEPS_DIR/include -I$DEPS_DIR/include/ncursesw -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN" \
     LDFLAGS="$COMMON_LDFLAGS" \
     LIBS="-lncursesw -ltinfow -lwasi_posix_shim -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman" \
     NCURSESW_CFLAGS="-I$DEPS_DIR/include/ncursesw -I$DEPS_DIR/include" \

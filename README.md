@@ -5,9 +5,9 @@ GNU `nano 8.0` text editor compiled to WebAssembly (`wasm32-wasip1`), statically
 ## Features
 
 - **Compiled-in Terminfo Fallbacks**: `xterm-256color`, `xterm`, `vt220`, `vt100`, and `dumb` are compiled directly into `libtinfow.a` via `MKfallback.sh` — no external `/usr/share/terminfo` database files required at runtime.
-- **Dynamic Terminal Dimensions (`TIOCGWINSZ`)**: Queries `LINES` and `COLUMNS` environment variables (defaulting to `80x24`) via a lightweight WASI `termios` / `ioctl` shim.
+- **Dynamic Terminal Dimensions (`TIOCGWINSZ`)**: Queries `LINES` and `COLUMNS` environment variables (defaulting to `80x24`) and handles interactive window resizing via [wasi-termios-brsh](https://github.com/eliotstocker/wasi-termios-brsh).
 - **Standard `wasi_snapshot_preview1` ABI**: Zero custom host (`env.*`) imports; runs directly in `brsh`'s `WasmCommand` or any `wasi_snapshot_preview1` runtime.
-- **Compact Binary**: `574 KB` stripped (`dist/nano.wasm`).
+- **Compact Binary**: `681 KB` stripped (`dist/nano.wasm`).
 
 ## Usage in `brsh`
 
@@ -41,7 +41,7 @@ npm run build
 bash scripts/build.sh
 ```
 
-The build script automatically downloads `wasi-sdk-25.0`, `ncurses-6.5`, and `nano-8.0`, builds the host `tic`/`infocmp` tools to generate the fallback terminfo table, compiles the WASI POSIX/termios shim (`shim/`), and links `dist/nano.wasm`.
+The build script automatically downloads `wasi-sdk-25.0`, `ncurses-6.5`, and `nano-8.0`, initializes [wasi-termios-brsh](https://github.com/eliotstocker/wasi-termios-brsh) for POSIX terminal handling and window resizing, compiles the WASI POSIX shim (`shim/`), and links `dist/nano.wasm`.
 
 ## License
 
