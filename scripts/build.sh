@@ -16,6 +16,9 @@ NANO_VERSION="8.0"
 mkdir -p "$BUILD_DIR" "$DIST_DIR" "$SHIM_DIR/lib"
 cd "$BUILD_DIR"
 
+if [[ ! -f "$WASI_TERMIOS_DIR/src/termios.c" ]] && [[ -f "$ROOT_DIR/../wasi-termios-brsh/src/termios.c" ]]; then
+    WASI_TERMIOS_DIR="$ROOT_DIR/../wasi-termios-brsh"
+fi
 if [[ ! -f "$WASI_TERMIOS_DIR/src/termios.c" ]]; then
     echo "=== Initializing wasi-termios-brsh ==="
     git -C "$ROOT_DIR" submodule update --init --recursive 2>/dev/null || \
@@ -27,8 +30,10 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 if [[ "$OS" == "Darwin" ]]; then
     WASI_OS="macos"
+    BUILD_TRIPLET="${ARCH}-apple-darwin"
 elif [[ "$OS" == "Linux" ]]; then
     WASI_OS="linux"
+    BUILD_TRIPLET="${ARCH}-pc-linux-gnu"
 else
     echo "Unsupported host OS: $OS" >&2
     exit 1
@@ -144,7 +149,7 @@ mkdir -p "$WASM_NCURSES" "$DEPS_DIR"
     ac_cv_header_sys_ioctl_h=yes \
     "$NCURSES_SRC/configure" \
         --host=wasm32-unknown-wasi \
-        --build="${ARCH}-apple-darwin" \
+        --build="${BUILD_TRIPLET}" \
         --prefix="$DEPS_DIR" \
         --without-cxx \
         --without-cxx-binding \
@@ -198,7 +203,7 @@ mkdir -p "$WASM_NANO"
 (
     cd "$WASM_NANO"
     COMMON_FLAGS="--target=wasm32-wasip1 -O2 -I$WASI_TERMIOS_DIR/include -I$SHIM_DIR/include -I$DEPS_DIR/include -I$DEPS_DIR/include/ncursesw -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_MMAN"
-    COMMON_LDFLAGS="-Wl,--wrap=poll -Wl,--wrap=isatty -Wl,--wrap=readlink -Wl,--wrap=readlinkat -L$DEPS_DIR/lib -L$SHIM_DIR/lib -lncursesw -ltinfow -lwasi_posix_shim -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
+    COMMON_LDFLAGS="-Wl,--export=set_terminal_size -Wl,--export=get_termios_lflag -Wl,--wrap=poll -Wl,--wrap=isatty -Wl,--wrap=readlink -Wl,--wrap=readlinkat -L$DEPS_DIR/lib -L$SHIM_DIR/lib -lncursesw -ltinfow -lwasi_posix_shim -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 
     CC="$WASI_SDK_DIR/bin/clang" \
     AR="$WASI_SDK_DIR/bin/llvm-ar" \
@@ -299,7 +304,7 @@ mkdir -p "$WASM_NANO"
     gl_cv_func_strstr_linear=yes \
     "$NANO_SRC/configure" \
         --host=wasm32-unknown-wasi \
-        --build="${ARCH}-apple-darwin" \
+        --build="${BUILD_TRIPLET}" \
         --prefix=/usr \
         --sysconfdir=/etc \
         --disable-nls \

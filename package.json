@@ -1,6 +1,6 @@
 {
   "name": "nano-wasm",
-  "version": "8.0.0",
+  "version": "8.0.1",
   "description": "GNU nano 8.0 text editor compiled to WebAssembly (wasm32-wasip1) with ncurses 6.5 and built-in terminfo fallbacks",
   "main": "./index.js",
   "exports": {
